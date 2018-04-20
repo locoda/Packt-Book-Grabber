@@ -40,7 +40,7 @@ def claim_book(browser):
 def ifttt_notify(file='credential.json'):
     r = requests.get(FREE_BOOk_URL, headers={'User-Agent': USER_AGENT})
     t = html.fromstring(r.content)
-    with open('credential.json') as fd:
+    with open(file) as fd:
         data = json.load(fd)
     title = "".join(t.xpath('//div[@class="dotd-title"]//text()')).strip()
     r = requests.post(data["ifttt"], data = { "value1" : title})
