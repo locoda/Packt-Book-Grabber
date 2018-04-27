@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import re
 import shutil
 
@@ -51,7 +52,7 @@ def login(s, file='credential.json'):
             'form_id': tree.xpath('//form[@id="packt-v3-account-login-form"]//input[@name="form_id"]/@value')[0],
         }
     except KeyError:
-        print('Check your username and password in "credential.json" file')
+        logger.error('Login Failed. Add your username and password configuration to file')
     r = s.post(LOGIN_URL, data=data, headers=headers)
     return ('account' in r.url)
 
@@ -69,7 +70,7 @@ def claim_book(s, file='credential.json'):
     try:
         api_key = data['anti-captcha']
     except KeyError:
-        print('Please add your anti-captcha api key in "credential.json" file')
+        logger.error('Claim Failed. Add your anti-captcha api key configuration to file')
         return
 
     key_pattern = re.compile("Packt.offers.onLoadRecaptcha\(\'(.+?)\'\)")
@@ -101,11 +102,11 @@ def download_book(s, n, dtype, ddir):
     for book in booklist[:n]:
         nid = book.xpath('./@nid')[0]
         title = book.xpath('./@title')[0]
-        print("Downloading Book %s: %s" % (nid, title))
+        logger.info("Downloading Book %s: %s" % (nid, title))
         try:
             link = book.xpath('.//a[contains(@href,"%s")]/@href' % dtype)[0]
         except IndexError:
-            print("%s for this book doesn't exsit" % dtype)
+            logger.error("%s for this book doesn't exsit" % dtype)
             continue
         r = s.get(BASE_URL + link, headers=headers, stream=True)
         filename = ddir + title + "." + dtype
@@ -127,15 +128,13 @@ def ifttt_notify(file='credential.json'):
     IFTTT notification
         :param file:  contains ifttt webhook
     """
-
     with open(file) as fd:
         data = json.load(fd)
-
     try:
         r = requests.post(data["ifttt"], data={
                           "value1": _get_free_book_title()})
     except KeyError:
-        print('Please add your ifttt webhook in "credential.json" file')
+        logger.error('IFTTT Notification Failed. Add your IFTTT webhook configuration to file')
     return (r.status_code is 200)
 
 
@@ -146,19 +145,23 @@ def mailgun_notify(file='credential.json'):
     """
     with open(file) as fd:
         data = json.load(fd)
-
-    r = requests.post(
-        "https://api.mailgun.net/v3/%s/messages" % data['mailgun']['domain'],
-        auth=("api", data['mailgun']['api']),
-        data={"from": "PacktPub Notification <packtpub@%s>" % data['mailgun']['domain'],
-              "to": "<%s>" % data['mailgun']['to'],
-              "subject": "Today's Free book from PacktPub!",
-              "text": "Today's free book is %s" % _get_free_book_title()})
-
+    try:
+        r = requests.post(
+            "https://api.mailgun.net/v3/%s/messages" % data['mailgun']['domain'],
+            auth=("api", data['mailgun']['api']),
+            data={"from": "PacktPub Notification <packtpub@%s>" % data['mailgun']['domain'],
+                "to": "<%s>" % data['mailgun']['to'],
+                "subject": "Today's Free book from PacktPub!",
+                "text": "Today's free book is %s" % _get_free_book_title()})
+    except KeyError:
+        logger.error('Mailgun Notification Failed. Add your Mailgun configuration to file')
     return (r.status_code is 200)
 
 
 if __name__ == "__main__":
+    # set logger
+    logging.basicConfig(level=logging.INFO, format='[%(levelname)s]%(message)s',)
+    logger = logging.getLogger()
     # parse arguments
     args = parse_arguments()
     # create a requests session using through process
@@ -168,28 +171,28 @@ if __name__ == "__main__":
     if args.notify is not None:
         if args.notify == "ifttt":
             if ifttt_notify():
-                print("ifttt successful notified")
+                logger.info("IFTTT Notification successful sent")
             else:
-                print("ifttt failed")
+                logger.error("IFTTT failed, Please check with your IFTTT configuration ")
         if args.notify == "mailgun":
             if mailgun_notify():
-                print("mailgun successful notified")
+                logger.info("Mailgun Notification successful sent")
             else:
-                print("mailgun failed")
+                logger.error("Mailgun failed, Please check with your Mailgun configuration ")
 
     if (args.claim or args.download):
         # Login
         if login(s):
-            print('Login Successful!!')
+            logger.info('Successfully Login into PacktPub')
         else:
-            print('Login Failed.. Check your username and password in "credential.json" file')
+            logger.error('Login Failed. Check with your username and password configuration')
 
         # Check if claim
         if args.claim:
             if claim_book(s):
-                print('Claim Successful')
+                logger.info('Claim Free book Successfully')
             else:
-                print('Claim Failed.. Check your anti-captcha in "credential.json" file')
+                logger.error('Claim Failed. Check with your anti-captcha configuration')
 
         # Check if should download
         if args.download is not None:
