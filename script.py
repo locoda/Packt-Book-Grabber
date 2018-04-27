@@ -28,56 +28,54 @@ def parse_arguments():
                         help="number of book to download")
     parser.add_argument("-t", "--type", type=str, choices=["pdf", "epub"], default="pdf",
                         help="type of book to download, default as pdf")
-    parser.add_argument("--dir", type=str, default="./",
+    parser.add_argument("--ddir", type=str, default="./",
                         help="direcotry you want to download the book, end with /, default as current directory")
+    parser.add_argument("-u", "--upload", type=str, choices=["dropbox"],
+                        help="upload to cloud drive you selected, only work when you also download")
+    parser.add_argument("--udir", type=str, default="/",
+                        help="direcotry you want to upload the book, end with /, default as root directory")
+    parser.add_argument("--config", type=str, default="credential.json",
+                        help="configuration file")
     return parser.parse_args()
 
+def _get_configuration(key):
+    try:
+        return config[key]
+    except KeyError:
+        logger.error("%s not founded in Configuration File, Aborted" % key)
+        exit()
 
-def login(s, file='credential.json'):
+def login(s):
     """
     login to Packt
-        :param s:  session used cross file
-        :param file: json file contains username and password
+        :param s:  session used cross script
     """
     r = s.get(LOGIN_URL, headers=headers)
     tree = html.fromstring(r.content)
 
-    with open(file) as fd:
-        info = json.load(fd)
 
-    try:
-        data = {
-            'name': info['name'],
-            'pass': info['pass'],
-            'op': 'Log in',
-            'form_build_id': tree.xpath('//form[@id="packt-v3-account-login-form"]//input[@name="form_build_id"]/@value')[0],
-            'form_id': tree.xpath('//form[@id="packt-v3-account-login-form"]//input[@name="form_id"]/@value')[0],
-        }
-    except KeyError:
-        logger.error('Login Failed. Add your username and password configuration to file')
+    data = {
+        'name': _get_configuration("name"),
+        'pass': _get_configuration("pass"),
+        'op': 'Log in',
+        'form_build_id': tree.xpath('//form[@id="packt-v3-account-login-form"]//input[@name="form_build_id"]/@value')[0],
+        'form_id': tree.xpath('//form[@id="packt-v3-account-login-form"]//input[@name="form_id"]/@value')[0],
+    }
     r = s.post(LOGIN_URL, data=data, headers=headers)
     return ('account' in r.url)
 
 
-def claim_book(s, file='credential.json'):
+def claim_book(s):
     """
     claim the free book
-        :param s:  session used cross file
+        :param s:  session used cross script
     """
     r = s.get(FREE_BOOk_URL, headers=headers)
     tree = html.fromstring(r.content)
 
-    with open(file) as fd:
-        data = json.load(fd)
-    try:
-        api_key = data['anti-captcha']
-    except KeyError:
-        logger.error('Claim Failed. Add your anti-captcha api key configuration to file')
-        return
-
     key_pattern = re.compile("Packt.offers.onLoadRecaptcha\(\'(.+?)\'\)")
     site_key = re.search(key_pattern, r.text).group(1)
-    client = AnticaptchaClient(api_key)
+    client = AnticaptchaClient(_get_configuration('anti-captcha'))
     task = NoCaptchaTaskProxylessTask(FREE_BOOk_URL, site_key)
     job = client.createTask(task)
     job.join()
@@ -88,13 +86,14 @@ def claim_book(s, file='credential.json'):
     return ('account' in r.url)
 
 
-def download_book(s, n, dtype, ddir):
+def download_book(s, n, dtype, ddir, dupload, udir):
     """
     Download books
-        :param s:  session used cross file
+        :param s:  session used cross script
         :param n: max number of books to download
         :param dtype: type of books to download
         :param ddir: directory of books to download
+        :param dupload: where to uploaded
     """
     r = s.get(MY_EBOOK_URL, headers=headers)
     tree = html.fromstring(r.content)
@@ -111,9 +110,18 @@ def download_book(s, n, dtype, ddir):
             logger.error("%s for this book doesn't exsit" % dtype)
             continue
         r = s.get(BASE_URL + link, headers=headers, stream=True)
-        filename = ddir + title + "." + dtype
-        with open(filename, 'wb') as f:
+        filename = "%s.%s" % (title, dtype)
+        with open(ddir + filename, 'wb') as f:
             shutil.copyfileobj(r.raw, f)
+
+        # check if upload needed
+        if dupload:
+            if dupload == "dropbox":
+                import dropbox
+                dbx = dropbox.Dropbox(_get_configuration("dropbox"))
+                with open(ddir + filename, 'rb') as f:
+                    dbx.files_upload(f.read(), udir + filename)
+
 
 
 def _get_free_book_title():
@@ -125,49 +133,42 @@ def _get_free_book_title():
     return ("".join(t.xpath('//div[@class="dotd-title"]//text()')).strip())
 
 
-def ifttt_notify(file='credential.json'):
+def ifttt_notify():
     """
     IFTTT notification
-        :param file:  contains ifttt webhook
     """
-    with open(file) as fd:
-        data = json.load(fd)
-    try:
-        r = requests.post(data["ifttt"], data={
-                          "value1": _get_free_book_title()})
-    except KeyError:
-        logger.error('IFTTT Notification Failed. Add your IFTTT webhook configuration to file')
+    r = requests.post(_get_configuration("ifttt"), data={
+                        "value1": _get_free_book_title()})
     return (r.status_code is 200)
 
 
-def mailgun_notify(file='credential.json'):
+def mailgun_notify():
     """
     Mailgun notification
-        :param file:  contains mailgup domain, api and email address
-    """
-    with open(file) as fd:
-        data = json.load(fd)
-    try:
-        r = requests.post(
-            "https://api.mailgun.net/v3/%s/messages" % data['mailgun']['domain'],
-            auth=("api", data['mailgun']['api']),
-            data={"from": "PacktPub Notification <packtpub@%s>" % data['mailgun']['domain'],
-                "to": "<%s>" % data['mailgun']['to'],
+å    """
+    mailgun_config = _get_configuration("mailgun")
+    r = requests.post(
+        "https://api.mailgun.net/v3/%s/messages" % mailgun_config['domain'],
+        auth=("api", mailgun_config['api']),
+        data={"from": "PacktPub Notification <packtpub@%s>" % mailgun_config['domain'],
+                "to": "<%s>" % mailgun_config['to'],
                 "subject": "Today's Free book from PacktPub!",
                 "text": "Today's free book is %s" % _get_free_book_title()})
-    except KeyError:
-        logger.error('Mailgun Notification Failed. Add your Mailgun configuration to file')
     return (r.status_code is 200)
 
 
 if __name__ == "__main__":
     # set logger
-    logging.basicConfig(level=logging.INFO, format='[%(levelname)s]%(message)s',)
+    logging.basicConfig(level=logging.INFO,
+                        format='[%(levelname)s] %(message)s',)
     logger = logging.getLogger()
     # parse arguments
     args = parse_arguments()
     # create a requests session using through process
     s = requests.Session()
+
+    with open(args.config) as fd:
+        config = json.load(fd)
 
     # Check if should notify
     if args.notify is not None:
@@ -175,27 +176,31 @@ if __name__ == "__main__":
             if ifttt_notify():
                 logger.info("IFTTT Notification successful sent")
             else:
-                logger.error("IFTTT failed, Please check with your IFTTT configuration ")
+                logger.error(
+                    "IFTTT failed, Please check with your IFTTT configuration ")
         if args.notify == "mailgun":
             if mailgun_notify():
                 logger.info("Mailgun Notification successful sent")
             else:
-                logger.error("Mailgun failed, Please check with your Mailgun configuration ")
+                logger.error(
+                    "Mailgun failed, Please check with your Mailgun configuration ")
 
     if (args.claim or args.download):
         # Login
         if login(s):
             logger.info('Successfully Login into PacktPub')
         else:
-            logger.error('Login Failed. Check with your username and password configuration')
+            logger.error(
+                'Login Failed. Check with your username and password configuration')
 
         # Check if claim
         if args.claim:
             if claim_book(s):
                 logger.info('Claim Free book Successfully')
             else:
-                logger.error('Claim Failed. Check with your anti-captcha configuration')
+                logger.error(
+                    'Claim Failed. Check with your anti-captcha configuration')
 
         # Check if should download
         if args.download is not None:
-            download_book(s, args.download, args.type, args.dir)
+            download_book(s, args.download, args.type, args.ddir, args.upload, args.udir)
