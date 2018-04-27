@@ -30,13 +30,14 @@ def parse_arguments():
                         help="type of book to download, default as pdf")
     parser.add_argument("--ddir", type=str, default="./",
                         help="direcotry you want to download the book, end with /, default as current directory")
-    parser.add_argument("-u", "--upload", type=str, choices=["dropbox"],
+    parser.add_argument("-u", "--upload", type=str, choices=["dropbox", "ftp"],
                         help="upload to cloud drive you selected, only work when you also download")
     parser.add_argument("--udir", type=str, default="/",
                         help="direcotry you want to upload the book, end with /, default as root directory")
     parser.add_argument("--config", type=str, default="credential.json",
                         help="configuration file")
     return parser.parse_args()
+
 
 def _get_configuration(key):
     try:
@@ -45,6 +46,7 @@ def _get_configuration(key):
         logger.error("%s not founded in Configuration File, Aborted" % key)
         exit()
 
+
 def login(s):
     """
     login to Packt
@@ -52,7 +54,6 @@ def login(s):
     """
     r = s.get(LOGIN_URL, headers=headers)
     tree = html.fromstring(r.content)
-
 
     data = {
         'name': _get_configuration("name"),
@@ -121,7 +122,13 @@ def download_book(s, n, dtype, ddir, dupload, udir):
                 dbx = dropbox.Dropbox(_get_configuration("dropbox"))
                 with open(ddir + filename, 'rb') as f:
                     dbx.files_upload(f.read(), udir + filename)
-
+            if dupload == "ftp":
+                import ftplib
+                ftp_config = _get_configuration("ftp")
+                ftp = ftplib.FTP(ftp_config['server'])
+                ftp.login(ftp_config['user'], ftp_config['pass'])
+                ftp.cwd(udir)
+                ftp.storbinary("STOR " + filename, open(ddir + filename, 'rb'))
 
 
 def _get_free_book_title():
@@ -138,22 +145,22 @@ def ifttt_notify():
     IFTTT notification
     """
     r = requests.post(_get_configuration("ifttt"), data={
-                        "value1": _get_free_book_title()})
+        "value1": _get_free_book_title()})
     return (r.status_code is 200)
 
 
 def mailgun_notify():
     """
     Mailgun notification
-å    """
+    """
     mailgun_config = _get_configuration("mailgun")
     r = requests.post(
         "https://api.mailgun.net/v3/%s/messages" % mailgun_config['domain'],
         auth=("api", mailgun_config['api']),
         data={"from": "PacktPub Notification <packtpub@%s>" % mailgun_config['domain'],
-                "to": "<%s>" % mailgun_config['to'],
-                "subject": "Today's Free book from PacktPub!",
-                "text": "Today's free book is %s" % _get_free_book_title()})
+              "to": "<%s>" % mailgun_config['to'],
+              "subject": "Today's Free book from PacktPub!",
+              "text": "Today's free book is %s" % _get_free_book_title()})
     return (r.status_code is 200)
 
 
@@ -203,4 +210,5 @@ if __name__ == "__main__":
 
         # Check if should download
         if args.download is not None:
-            download_book(s, args.download, args.type, args.ddir, args.upload, args.udir)
+            download_book(s, args.download, args.type,
+                          args.ddir, args.upload, args.udir)
