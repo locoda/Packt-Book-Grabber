@@ -61,7 +61,7 @@ Please put your user name after `"name":` and your password after `"pass":`
 
 5. If you want to claim and then download:
 
-   ```
+   ```shell
    python3 script.py -c -d 1
    ```
 
