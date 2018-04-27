@@ -73,4 +73,14 @@ Please put your user name after `"name":` and your password after `"pass":`
    python3 script.py -c -d 1
    ```
 
+7. If you want to upload to dropbox:
+
+   You have to config `dropbox` field in `credential.json` file. You can go to [Dropbox Developers](https://www.dropbox.com/developers/apps/) to create an app for this use. You do have to generate `access token` and put into `credential.json` file.
+
+   Note: Upload choice must be used as same time at download
+
+   ```shell
+   python3 script.py -d 1 -u dropbox
+   ```
+
    ​
