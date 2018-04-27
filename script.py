@@ -1,6 +1,6 @@
+import argparse
 import json
 
-import mechanicalsoup
 import requests
 from lxml import html
 
@@ -9,32 +9,43 @@ LOGIN_URL = "https://www.packtpub.com/login"
 FREE_BOOk_URL = "https://www.packtpub.com/packt/offers/free-learning"
 MY_EBOOK_URL = "https://www.packtpub.com/account/my-ebooks"
 USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
+headers = {'User-Agent': USER_AGENT}
 
-def login(browser, file='credential.json'):
+
+def login(session, file='credential.json'):
     """
     login to Packt
         :param file: json file contains username and password
         :param browser:  browser used cross file
     """
+    r = s.get(LOGIN_URL, headers=headers)
+    tree = html.fromstring(r.content)
+
     with open(file) as fd:
-        data = json.load(fd)
-    browser.open(LOGIN_URL)
-    browser.select_form('form[id="packt-v3-account-login-form"]')
-    browser['name'] = data['name']
-    browser['pass'] = data['pass']
-    resp = browser.submit_selected()
-    return ('account' in browser.get_url())
+        info = json.load(fd)
+
+    data = {
+        'name': info['name'],
+        'pass': info['pass'],
+        'op': 'Log in',
+        'form_build_id': [],
+        'form_id': [],
+    }
+    data['op'] = "Log in"
+    data['form_build_id'] = tree.xpath(
+        '//form[@id="packt-v3-account-login-form"]//input[@name="form_build_id"]/@value')
+    data['form_id'] = tree.xpath(
+        '//form[@id="packt-v3-account-login-form"]//input[@name="form_id"]/@value')
+
+    r = s.post(LOGIN_URL, data=data, headers=headers)
+    return ('account' in r.url)
 
 
-def claim_book(browser):
+def claim_book(session):
     """
     claim the free book
         :param browser:  browser used cross file
     """
-    browser.open(FREE_BOOk_URL)
-    browser.select_form('form[id="free-learning-form"]')
-    resp = browser.submit_selected()
-    return ('account' in browser.get_url())
 
 
 def ifttt_notify(file='credential.json'):
@@ -43,16 +54,20 @@ def ifttt_notify(file='credential.json'):
     with open(file) as fd:
         data = json.load(fd)
     title = "".join(t.xpath('//div[@class="dotd-title"]//text()')).strip()
-    r = requests.post(data["ifttt"], data = { "value1" : title})
+    print(title)
+    try:
+        r = requests.post(data["ifttt"], data={"value1": title})
+    except KeyError:
+        print('Please add your ifttt webhook in "credential.json" file')
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-n", "--notify", type=str,
+                    help="notify the selected agent: e.g. ifttt")
+args = parser.parse_args()
+s = requests.Session()
 
-browser = mechanicalsoup.StatefulBrowser(
-    soup_config={'features': 'lxml'},
-    user_agent=USER_AGENT
-)
-
-if not login(browser):
+if not login(s):
     print('Login Failed.. Check your "credential.json" file')
-if not claim_book(browser):
-    print('Claim Failed.. Not sure Why')
-# ifttt_notify()
+print(args.notify)
+if args.notify == "ifttt":
+    ifttt_notify()
