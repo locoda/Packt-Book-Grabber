@@ -14,6 +14,19 @@ MY_EBOOK_URL = "https://www.packtpub.com/account/my-ebooks"
 USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
 headers = {'User-Agent': USER_AGENT}
 
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--claim", action="store_true",
+                        help="if claim free book on this run")
+    parser.add_argument("-n", "--notify", type=str, choices=["ifttt"],
+                        help="notify the selected agent")
+    parser.add_argument("-d", "--download", type=int,
+                        help="number of book to download")
+    parser.add_argument("-t", "--type", type=str, choices=["pdf", "epub"], default="pdf",
+                        help="type of book to download, default as pdf")
+    parser.add_argument("--dir", type=str, default="./",
+                        help="direcotry you want to download the book, end with /, default as current directory")
+    return parser.parse_args()
 
 def login(s, file='credential.json'):
     """
@@ -114,35 +127,25 @@ def ifttt_notify(file='credential.json'):
     except KeyError:
         print('Please add your ifttt webhook in "credential.json" file')
 
+if __name__ == "__main__":
+    # parse arguments
+    args = parse_arguments()
+    # create a requests session using through process
+    s = requests.Session()
+    # Login
+    if not login(s):
+        print('Login Failed.. Check your username and password in "credential.json" file')
+    else:
+        print('Login Successful!!')
+    # Check if claim
+    if args.claim:
+        if not claim_book(s):
+            print('Claim Failed.. Check your anti-captcha in "credential.json" file')
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--claim", action="store_true",
-                    help="if claim free book on this run")
-parser.add_argument("-n", "--notify", type=str, choices=["ifttt"],
-                    help="notify the selected agent")
-parser.add_argument("-d", "--download", type=int,
-                    help="number of book to download")
-parser.add_argument("-t", "--type", type=str, choices=["pdf", "epub"], default="pdf",
-                    help="type of book to download, default as pdf")
-parser.add_argument("--dir", type=str, default="./",
-                    help="direcotry you want to download the book, end with /, default as current directory")
-args = parser.parse_args()
-
-s = requests.Session()
-# Login
-if not login(s):
-    print('Login Failed.. Check your username and password in "credential.json" file')
-else:
-    print('Login Successful!!')
-# Check if claim
-if args.claim:
-    if not claim_book(s):
-        print('Claim Failed.. Check your anti-captcha in "credential.json" file')
-
-# Check if should notify
-if args.notify is not None:
-    if args.notify == "ifttt":
-        ifttt_notify()
-# Check if should download
-if args.download is not None:
-    download_book(s, args.download, args.type, args.dir)
+    # Check if should notify
+    if args.notify is not None:
+        if args.notify == "ifttt":
+            ifttt_notify()
+    # Check if should download
+    if args.download is not None:
+        download_book(s, args.download, args.type, args.dir)
