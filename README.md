@@ -47,19 +47,27 @@ Please put your user name after `"name":` and your password after `"pass":`
    python3 script.py -n ifttt
    ```
 
-3. If you just want to download a book (first book in your library):
+3. If you want to notify yourself with mailgun email service:
+
+   You have to config the `mailgun` field in `credential.json` file. You can go to [Mailgun](https://www.mailgun.com/) to register for a new account (which is free). After login, you can find your api key on your dashboard (find `Private API Key` in page ) and domain name after clicking `Domain` tab. If you don't have any domain yourself, the sandbox domain is good to use.
+
+   ```
+   python3 script.py -n mailgun
+   ```
+
+4. If you just want to download a book (first book in your library):
 
    ```shell
    python3 script.py -d 1
    ```
 
-4.  If you want to download a book with type epub (default is pdf) to desktop:
+5. If you want to download a book with type epub (default is pdf) to desktop:
 
    ```Shell
    python3 script.py -d 1 -t epub --dir ~/Desktop/
    ```
 
-5. If you want to claim and then download:
+6. If you want to claim and then download:
 
    ```shell
    python3 script.py -c -d 1
