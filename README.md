@@ -72,8 +72,7 @@ Please put your user name after `"name":` and your password after `"pass":`
    ```shell
    python3 script.py -c -d 1
    ```
-
-7. If you want to upload to dropbox:
+7. If you want to upload to dropbox:
 
    You have to config `dropbox` field in `credential.json` file. You can go to [Dropbox Developers](https://www.dropbox.com/developers/apps/) to create an app for this use. You do have to generate `access token` and put into `credential.json` file.
 
@@ -84,3 +83,8 @@ Please put your user name after `"name":` and your password after `"pass":`
    ```
 
    ​
+
+## Further Plan 
+
+- [ ] Add **Google Drive** support
+- [ ] Download book from **multiple pages**
