@@ -137,7 +137,9 @@ def _get_free_book_title():
     """
     r = requests.get(FREE_BOOk_URL, headers={'User-Agent': USER_AGENT})
     t = html.fromstring(r.content)
-    return ("".join(t.xpath('//div[@class="dotd-title"]//text()')).strip())
+    title = "".join(t.xpath('//div[@class="dotd-title"]//text()')).strip()
+    logger.info("Today's free book is %s" % title)
+    return title
 
 
 def ifttt_notify():
