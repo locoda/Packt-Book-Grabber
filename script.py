@@ -205,7 +205,7 @@ if __name__ == "__main__":
         # Check if claim
         if args.claim:
             if claim_book(s):
-                logger.info('Claim Free book Successfully')
+                logger.info('Claim Free book [%s] Successfully' % _get_free_book_title())
             else:
                 logger.error(
                     'Claim Failed. Check with your anti-captcha configuration')
