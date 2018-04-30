@@ -142,27 +142,33 @@ def _get_free_book_title():
     return title
 
 
-def ifttt_notify():
+def ifttt_notify(msg=None):
     """
     IFTTT notification
     """
+    if msg is None:
+        msg = "Today's free book is [%s]" % _get_free_book_title()
+
     r = requests.post(_get_configuration("ifttt"), data={
-        "value1": _get_free_book_title()})
+        "value1": msg})
     return (r.status_code is 200)
 
 
-def mailgun_notify():
+def mailgun_notify(msg=None):
     """
     Mailgun notification
     """
+    if msg is None:
+        msg = "Today's free book is [%s]" % _get_free_book_title()
+
     mailgun_config = _get_configuration("mailgun")
     r = requests.post(
         "https://api.mailgun.net/v3/%s/messages" % mailgun_config['domain'],
         auth=("api", mailgun_config['api']),
         data={"from": "PacktPub Notification <packtpub@%s>" % mailgun_config['domain'],
               "to": "<%s>" % mailgun_config['to'],
-              "subject": "Today's Free book from PacktPub!",
-              "text": "Today's free book is %s" % _get_free_book_title()})
+              "subject": "Notification from PacktPub Grabber",
+              "text": msg})
     return (r.status_code is 200)
 
 
@@ -194,23 +200,41 @@ if __name__ == "__main__":
                 logger.error(
                     "Mailgun failed, Please check with your Mailgun configuration ")
 
+    message = ""
     if (args.claim or args.download):
         # Login
         if login(s):
             logger.info('Successfully Login into PacktPub')
+            # Check if claim
+            if args.claim:
+                if claim_book(s):
+                    message = 'Claim Free book [%s] Successfully' % _get_free_book_title(
+                    )
+                    logger.info(
+                        'Claim Free book [%s] Successfully' % _get_free_book_title())
+                else:
+                    message = 'Claim Failed. Check with your anti-captcha configuration'
+                    logger.error(
+                        'Claim Failed. Check with your anti-captcha configuration')
+
+            # Check if should download
+            if args.download is not None:
+                download_book(s, args.download, args.type,
+                              args.ddir, args.upload, args.udir)
         else:
+            message = 'Claim Failed. Check with your anti-captcha configuration'
             logger.error(
                 'Login Failed. Check with your username and password configuration')
 
-        # Check if claim
-        if args.claim:
-            if claim_book(s):
-                logger.info('Claim Free book [%s] Successfully' % _get_free_book_title())
-            else:
-                logger.error(
-                    'Claim Failed. Check with your anti-captcha configuration')
-
-        # Check if should download
-        if args.download is not None:
-            download_book(s, args.download, args.type,
-                          args.ddir, args.upload, args.udir)
+        if args.notify is not None:
+            if message is not "":
+                if args.notify == "ifttt":
+                    if ifttt_notify(message):
+                        logger.info("Additional message about claim or download Sent to IFTTT")
+                    else:
+                        logger.error("Additional message about claim or download NOT sent to IFTTT")
+                if args.notify == "mailgun":
+                    if mailgun_notify(message):
+                        logger.info("Additional message about claim or download Sent to EMAIL")
+                    else:
+                        logger.error("Additional message about claim or download NOT sent to EMAIL")
