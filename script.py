@@ -81,9 +81,11 @@ def claim_book(s):
     job = client.createTask(task)
     job.join()
     link = tree.xpath('//form[@id="free-learning-form"]/@action')[0]
-
+    recaptcha = job.get_solution_response()
+    
+    logger.info("recaptcha-response is %s" % recaptcha)
     r = s.post(BASE_URL+link,
-               data={'g-recaptcha-response': job.get_solution_response()}, headers=headers)
+               data={'g-recaptcha-response': recaptcha}, headers=headers)
     return ('account' in r.url)
 
 
