@@ -16,7 +16,7 @@ FREE_BOOk_URL = "https://www.packtpub.com/packt/offers/free-learning"
 MY_EBOOK_URL = "https://www.packtpub.com/account/my-ebooks"
 USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
 headers = {'User-Agent': USER_AGENT}
-
+title = None
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -139,6 +139,9 @@ def _get_free_book_title():
     """
     get title of today's free book -- used for sent notifications
     """
+    global title
+    if title is not None:
+        return title
     r = requests.get(FREE_BOOk_URL, headers={'User-Agent': USER_AGENT})
     t = html.fromstring(r.content)
     title = "".join(t.xpath('//div[@class="dotd-title"]//text()')).strip()
