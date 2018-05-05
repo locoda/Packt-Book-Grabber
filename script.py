@@ -36,6 +36,8 @@ def parse_arguments():
                         help="direcotry you want to upload the book, end with /, default as root directory")
     parser.add_argument("--config", type=str, default="credential.json",
                         help="configuration file")
+    parser.add_argument("--log", type=str,
+                        help="log file")
     return parser.parse_args()
 
 
@@ -82,7 +84,7 @@ def claim_book(s):
     job.join()
     link = tree.xpath('//form[@id="free-learning-form"]/@action')[0]
     recaptcha = job.get_solution_response()
-    
+
     logger.info("recaptcha-response is %s" % recaptcha)
     r = s.post(BASE_URL+link,
                data={'g-recaptcha-response': recaptcha}, headers=headers)
@@ -175,12 +177,18 @@ def mailgun_notify(msg=None):
 
 
 if __name__ == "__main__":
-    # set logger
-    logging.basicConfig(level=logging.INFO,
-                        format='[%(levelname)s] %(message)s',)
-    logger = logging.getLogger()
     # parse arguments
     args = parse_arguments()
+    if args.log is None:
+        # set logger
+        logging.basicConfig(level=logging.INFO,
+                            format='[%(levelname)s] %(message)s',)
+        logger = logging.getLogger()
+    else:
+        logging.basicConfig(filename=args.log, level=logging.INFO,
+                            format='[%(levelname)s] %(message)s',)
+        logger = logging.getLogger()
+
     # create a requests session using through process
     s = requests.Session()
 
@@ -232,11 +240,15 @@ if __name__ == "__main__":
             if message is not "":
                 if args.notify == "ifttt":
                     if ifttt_notify(message):
-                        logger.info("Additional message about claim or download Sent to IFTTT")
+                        logger.info(
+                            "Additional message about claim or download Sent to IFTTT")
                     else:
-                        logger.error("Additional message about claim or download NOT sent to IFTTT")
+                        logger.error(
+                            "Additional message about claim or download NOT sent to IFTTT")
                 if args.notify == "mailgun":
                     if mailgun_notify(message):
-                        logger.info("Additional message about claim or download Sent to EMAIL")
+                        logger.info(
+                            "Additional message about claim or download Sent to EMAIL")
                     else:
-                        logger.error("Additional message about claim or download NOT sent to EMAIL")
+                        logger.error(
+                            "Additional message about claim or download NOT sent to EMAIL")
