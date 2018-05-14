@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import shutil
+import time
 
 import requests
 from lxml import html
@@ -17,6 +18,7 @@ MY_EBOOK_URL = "https://www.packtpub.com/account/my-ebooks"
 USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
 headers = {'User-Agent': USER_AGENT}
 title = None
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -255,3 +257,5 @@ if __name__ == "__main__":
                     else:
                         logger.error(
                             "Additional message about claim or download NOT sent to EMAIL")
+    logger.info("IFTTT Notification successful sent")
+    time.sleep(1)
